@@ -1,68 +1,486 @@
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+### 01. Use `rcc` to create a container component
 
-## Available Scripts
+### 02. Use `rfc` to create a functional component, or `rfce` to export the component at the bottom
 
-In the project directory, you can run:
+### 03. Use `imp` to import Navbar.jsx into App.jsx
 
-### `npm start`
+### 04. We need a global state for all container components, that's reason why we need context API
 
-Runs the app in the development mode.<br>
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+### 05. We create a context.jsx under root directory
 
-The page will reload if you make edits.<br>
-You will also see any lint errors in the console.
+Every context.jsx should export 2 things: a Provider class, and a Consumer function
 
-### `npm test`
+```
+import React, { Component } from 'react'
 
-Launches the test runner in the interactive watch mode.<br>
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+const Context = React.createContext()
 
-### `npm run build`
+export class Provider extends Component {
+  state = {
+    track_list: [
+      {
+        track: {
+          track_name: 'abc'
+        }
+      },
+      {
+        track: {
+          track_name: '123'
+        }
+      }
+    ],
+    heading: 'Top 10 Tracks'
+  }
 
-Builds the app for production to the `build` folder.<br>
-It correctly bundles React in production mode and optimizes the build for the best performance.
+  render() {
+    return (
+      <Context.Provider value={this.state}>
+        {this.props.children}
+      </Context.Provider>
+    )
+  }
+}
 
-The build is minified and the filenames include the hashes.<br>
-Your app is ready to be deployed!
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+If we put {this.state} as the value of the Provider, it will be shared by all components
+You can share only part of the state of the Provider, like {this.state.track_list}
 
-### `npm run eject`
+A `consumer function` will be imported into other component, to gain the access to the context (defined in Provider)
+This is similar with `connect` in Redux
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+### 06. Before starts consuming context, in App.jsx, we need to import Provider from context.js, then wrap everything with Provider
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```
+import React, { Component } from 'react'
+import { BrowserRouter as Router, Route, Switch } from 'react-router-dom'
+import { Provider } from './context'
+import Navbar from './components/layout/Navbar'
+import Layout from './components/layout/Layout'
+import './App.css'
 
-Instead, it will copy all the configuration files and the transitive dependencies (Webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+class App extends Component {
+  render() {
+    return (
+      <Provider>
+        <Router>
+          <React.Fragment>
+            <Navbar />
+            <div className="container">
+              <Switch>
+                <Route exact path="/" component={Layout} />
+              </Switch>
+            </div>
+          </React.Fragment>
+        </Router>
+      </Provider>
+    )
+  }
+}
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+export default App
 
-## Learn More
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### 07. Now in other component, we can start using the consumer to access the context
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```
+import React, { Component } from 'react'
+import { Consumer } from '../../context'
 
-### Code Splitting
+class Tracks extends Component {
+  render() {
+    return (
+     <Consumer>
+       {value => {
+         console.log(value)
+       }}
+     </Consumer>
+    )
+  }
+}
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/code-splitting
+export default Tracks
+```
 
-### Analyzing the Bundle Size
+This `value` is the value you defined in Provider class render function
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size
+```
+render() {
+    return (
+      <Context.Provider value={this.state}>
+        {this.props.children}
+      </Context.Provider>
+    )
+  }
+```
 
-### Making a Progressive Web App
+### 08. Create a .env file in root directory.
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app
+```
+REACT_APP_MM_KEY=<YOUR_MUSIXMATCH_API_KEY>
+```
 
-### Advanced Configuration
+Please note: For react project created by create-react-app, if you want to use .env file, you don't need to install dotenv, BUT THE VARIABLES YOU PUT IN .env FILE, MUST PREFIX WITH `REACT_APP_`, for example `REACT_APP_MM_KEY`.
+Also if you made any changes to .env files, make sure you restart the project.
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/advanced-configuration
+### 09. Now fetch the data from MusixMatch API
 
-### Deployment
+```
+  componentDidMount = async () => {
+    try {
+      const response = await axios.get(
+        `https://cors-anywhere.herokuapp.com/http://api.musixmatch.com/ws/1.1/chart.tracks.get?page=1&page_size=10&country=us&f_has_lyrics=1&apikey=${
+          process.env.REACT_APP_MM_KEY
+        }`
+      )
+      const {
+        data: {
+          message: {
+            body: { track_list }
+          }
+        }
+      } = response
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/deployment
+      this.setState(prevState => {
+        return { ...prevState, track_list }
+      })
+    } catch (error) {
+      console.log(error)
+    }
+  }
+```
 
-### `npm run build` fails to minify
+### 09. Create Tracks container component and Track functional component
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify
+```
+import React, { Component } from 'react'
+import { Consumer } from '../../context'
+import Spinner from '../layout/Spinner'
+import Track from './Track'
+
+class Tracks extends Component {
+  render() {
+    return (
+      <Consumer>
+        {value => {
+          const { track_list, heading } = value
+          if (!track_list || !track_list.length) {
+            return <Spinner />
+          } else {
+            return (
+              <React.Fragment>
+                <h3 className="text-center mb-4">{heading}</h3>
+                <div className="row">
+                  {track_list.map(item => (
+                    <Track key={item.track.track_id} track={item.track} />
+                  ))}
+                </div>
+              </React.Fragment>
+            )
+          }
+        }}
+      </Consumer>
+    )
+  }
+}
+
+export default Tracks
+
+```
+
+```
+import React from 'react'
+import { Link } from 'react-router-dom'
+
+const Track = ({ track }) => {
+  return (
+    <div className="col-md-6">
+      <div className="card mb-4 shadow-sm">
+        <div className="card-body">
+          <h5>{track.artist_name}</h5>
+          <p className="card-text">
+            <strong>
+              <i className="fas fa-play" /> Track
+            </strong>
+            : {track.track_name}
+            <br />
+            <strong>
+              <i className="fas fa-compact-disc" /> Album
+            </strong>
+            : {track.album_name}
+          </p>
+          <Link
+            to={`lyrics/track/${track.track_id}`}
+            className="btn btn-dark btn-block"
+          >
+            <i className="fas fa-chevron-right" /> View Lyrics
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default Track
+
+```
+
+**Please note:** For button, use `{ Link }` from 'react-router-dom', instead of using a normal button. By doing this you don't need to write a click event handler for the button!
+
+### 10. Create a new route for displaying lyrics
+
+```
+  <Switch>
+    <Route exact path="/" component={Layout} />
+    <Route exact path="/lyrics/track/:id" component={Lyrics} />
+  </Switch>
+```
+
+and retrieve this id param from Lyrics component
+
+```
+ componentDidMount = async () => {
+    const {
+      match: {
+        params: { id }
+      }
+    } = this.props
+  }
+```
+
+and render
+
+```
+  render() {
+    const { lyrics, track } = this.state
+    if (
+      !lyrics ||
+      !track ||
+      Object.keys(lyrics).length === 0 ||
+      Object.keys(track).length === 0
+    ) {
+      return <Spinner />
+    } else {
+      return (
+        <React.Fragment>
+          <Link to="/" className="btn btn-dark btn-sm mb-4">
+            Go Back
+          </Link>
+          <div className="card">
+            <h5 className="card-header">
+              {track.track_name} by{' '}
+              <span className="text-secondary">{track.artist_name}</span>
+            </h5>
+            <div className="card-body">
+              <p className="card-text">{lyrics.lyrics_body}</p>
+            </div>
+          </div>
+          <ul className="list-group mt-3">
+            <li className="list-group-item">
+              <strong>Album ID</strong>: {track.album_id}
+            </li>
+            <li className="list-group-item">
+              <strong>Song Genre</strong>:{' '}
+              {track.primary_genres.music_genre_list &&
+              track.primary_genres.music_genre_list.length > 0
+                ? track.primary_genres.music_genre_list[0].music_genre
+                    .music_genre_name
+                : 'N/A'}
+            </li>
+            <li className="list-group-item">
+              <strong>Explicit Words</strong>:{' '}
+              {track.explicit === 0 ? 'No' : 'Yes'}
+            </li>
+            <li className="list-group-item">
+              <strong>Release Date</strong>:{' '}
+              <Moment format="DD-MM-YYYY">{track.updated_time}</Moment>
+            </li>
+          </ul>
+        </React.Fragment>
+      )
+    }
+  }
+```
+
+**Please note:** the correct way to check if a object is empty is do `Object.keys(lyrics).length === 0`, `lyrics === {}` won't work because object is reference type
+Also for displaying date, we use `moment` and `react-moment`
+
+### 11. Search component
+
+```
+export default class Search extends Component {
+  state = {
+    keyword: ''
+  }
+
+  onChangeHandler = event => {
+    const { name, value } = event.target
+    this.setState(prevState => {
+      return { ...prevState, [name]: value }
+    })
+  }
+
+  findTrack = async event => {
+    event.preventDefault()
+    const { keyword } = this.state
+
+    try {
+      const response = await axios.get(
+        `https://cors-anywhere.herokuapp.com/http://api.musixmatch.com/ws/1.1/track.search?q_track=${keyword}&page_size=10&page=1&s_track_rating=desc&apikey=${
+          process.env.REACT_APP_MM_KEY
+        }`
+      )
+      // now we receive the new list of track_list, we need to update the track_list in the context Provider
+      const {
+        data: {
+          message: {
+            body: { track_list }
+          }
+        }
+      } = response
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  render() {
+    return (
+      <Consumer>
+        {value => {
+          const { keyword } = this.state
+          return (
+            <div className="card card-body mb-4 p-4">
+              <h1 className="display-4 text-center">
+                <i className="fas fa-music" /> Search for a song:
+              </h1>
+              <p className="lead text-center">Get the lyrics for any song</p>
+              <form onSubmit={this.findTrack}>
+                <div className="form-group">
+                  <input
+                    type="text"
+                    className="form-control form-control-lg"
+                    placeholder="Enter song title..."
+                    name="keyword"
+                    value={keyword}
+                    onChange={this.onChangeHandler}
+                  />
+                </div>
+                <button
+                  className="btn btn-primary btn-lg btn-block mb-5"
+                  type="submit"
+                >
+                  Search Track Lyrics
+                </button>
+              </form>
+            </div>
+          )
+        }}
+      </Consumer>
+    )
+  }
+```
+
+Now if you search anything, you will get the new track_list, but the million dollar question is, **how do we update the old track_list from context provider with this new track_list??**
+
+### 12. First we need to create a dispatch function in context provider, so this function can be passed along to all components, for dispatching an action to the context provider
+```
+ // this method will be passed to all components for dispatching actions
+ dispatch: action => this.setState(prevState => reducer(prevState, action))
+```
+
+### 13. Also we need a reducer function, for updating the state of the Provider class
+```
+// very similar with normal Redux reducers
+const reducer = (state, action) => {
+  switch (action.type) {
+    case 'SEARCH_RESULT':
+      return { ...state, ...action.payload }
+    default:
+      return state
+  }
+}
+```
+
+### 14. Then we can start using the function in Search component
+```
+render() {
+    return (
+      <Consumer>
+        {value => {
+          const { dispatch } = value
+          const { keyword } = this.state
+          return (
+            <div className="card card-body mb-4 p-4">
+              <h1 className="display-4 text-center">
+                <i className="fas fa-music" /> Search for a song:
+              </h1>
+              <p className="lead text-center">Get the lyrics for any song</p>
+              <form onSubmit={this.findTrack.bind(this, dispatch)}>
+                <div className="form-group">
+                  <input
+                    type="text"
+                    className="form-control form-control-lg"
+                    placeholder="Enter song title..."
+                    name="keyword"
+                    value={keyword}
+                    onChange={this.onChangeHandler}
+                  />
+                </div>
+                <button
+                  className="btn btn-primary btn-lg btn-block mb-5"
+                  type="submit"
+                >
+                  Search Track Lyrics
+                </button>
+              </form>
+            </div>
+          )
+        }}
+      </Consumer>
+    )
+  }
+```
+
+**Please note:** if we need to pass the dispatch function to the findTrack function, we have to use <form onSubmit={this.findTrack.bind(this, dispatch)}> syntax, otherwise it won't work
+
+```
+findTrack = async (dispatch, event) => {
+    event.preventDefault()
+    const { keyword } = this.state
+
+    try {
+      const response = await axios.get(
+        `https://cors-anywhere.herokuapp.com/http://api.musixmatch.com/ws/1.1/track.search?q_track=${keyword}&page_size=10&page=1&s_track_rating=desc&apikey=${
+          process.env.REACT_APP_MM_KEY
+        }`
+      )
+      // now we receive the new list of track_list, we need to update the track_list in the context Provider
+      const {
+        data: {
+          message: {
+            body: { track_list }
+          }
+        }
+      } = response
+
+      const action = {
+        type: 'SEARCH_RESULT',
+        payload: {
+          track_list,
+          heading: 'Search Result'
+        }
+      }
+      // dispatch action to context 
+      dispatch(action)
+      // to clear the search input box
+      this.setState(prevState => {
+        return { ...prevState, keyword: '' }
+      })
+    } catch (error) {
+      console.log(error)
+    }
+  }
+```
+
+All done!!
